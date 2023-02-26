@@ -69,9 +69,29 @@ def create_network_and_apply_compvis(du_state_dict, multiplier, text_encoder, un
       break
 
   # get dims from state dict
-  size = du_state_dict[list(du_state_dict.keys())[0]].size()          # if conv2d size is like [320,4,1,1]
-  network_dim = min([s for s in size if s > 1])
-  print(f"dimension: {network_dim}, multiplier: {multiplier}")
+#   size = du_state_dict[list(du_state_dict.keys())[0]].size()          # if conv2d size is like [320,4,1,1]
+#   network_dim = min([s for s in size if s > 1])
+#   print(f"dimension: {network_dim}, multiplier: {multiplier}")
+
+  # get dims (rank) and alpha from state dict
+  # currently it is assumed all LoRA have same alpha. alpha may be different in future.
+  network_alpha = None
+  network_dim = None
+  for key, value in du_state_dict.items():
+    if network_alpha is None and 'alpha' in key:
+      network_alpha = value
+    if network_dim is None and 'lora_down' in key and len(value.size()) == 2:
+      network_dim = value.size()[0]
+    if network_alpha is not None and network_dim is not None:
+      break
+  if network_alpha is None:
+    network_alpha = network_dim
+
+#   print(f"dimension: {network_dim}, alpha: {network_alpha}, multiplier_unet: {multiplier_unet}, multiplier_tenc: {multiplier_tenc}")
+  if network_dim is None:
+    print(f"The selected model is not LoRA or not trained by `sd-scripts`?")
+    network_dim = 4
+    network_alpha = 1
 
   # create, apply and load weights
   network = LoRANetworkCompvis(text_encoder, unet, multiplier=multiplier, lora_dim=network_dim)
